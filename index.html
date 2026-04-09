@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow AI | Professional Productivity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --bg: #F5FBE6;
+            --primary: #215E61;
+            --secondary: #233D4D;
+            --accent: #FE7F2D;
+            --text: #233D4D;
+            --panel: rgba(255, 255, 255, 0.9);
+        }
+
+        .dark {
+            --bg: #121415;
+            --primary: #4ecdc4;
+            --secondary: #F5FBE6;
+            --accent: #FE7F2D;
+            --text: #F5FBE6;
+            --panel: rgba(35, 61, 77, 0.95);
+        }
+
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: var(--bg);
+            color: var(--text);
+            transition: all 0.3s ease;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: var(--panel);
+            border: 1px solid rgba(33, 94, 97, 0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        input, select, textarea, button {
+            position: relative !important;
+            z-index: 50 !important;
+            pointer-events: auto !important;
+        }
+
+        .task-card {
+            transition: all 0.2s ease;
+            border-left: 4px solid transparent;
+            cursor: grab;
+        }
+        .task-card:active {
+            cursor: grabbing;
+        }
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+        .priority-high { border-left-color: #ef4444; }
+        .priority-normal { border-left-color: var(--accent); }
+        .priority-low { border-left-color: var(--primary); }
+        
+        .sortable-ghost {
+            opacity: 0.3;
+            background: var(--accent) !important;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header Section -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-black tracking-tighter" style="color: var(--primary)">
+                    TaskFlow <span style="color: var(--accent)">AI</span>
+                </h1>
+                <p id="userStatus" class="text-[10px] font-bold uppercase tracking-widest opacity-60">System Ready</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="darkModeToggle" class="p-3 glass-panel rounded-2xl hover:scale-105 transition-all shadow-sm">
+                    <span id="themeIcon">🌙</span>
+                </button>
+                <button id="settingsBtn" class="px-5 py-3 glass-panel rounded-2xl hover:scale-105 transition-all shadow-sm flex items-center gap-2">
+                    <span class="text-xs font-black uppercase tracking-widest">Profile</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-8 space-y-6">
+                
+                <!-- Stats Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="glass-panel rounded-[2rem] p-6 flex items-center justify-around shadow-sm border border-black/5">
+                        <div class="text-center">
+                            <input id="timerInput" type="number" value="25" min="10" max="180" class="w-16 bg-transparent text-2xl font-black text-center outline-none">
+                            <p class="text-[8px] font-bold uppercase opacity-50">Set Mins (10-180)</p>
+                        </div>
+                        <div class="text-center">
+                            <h2 id="timerDisplay" class="text-4xl font-black tabular-nums">25:00</h2>
+                            <div class="flex gap-4 justify-center mt-1">
+                                <button id="timerToggle" class="text-[10px] font-black uppercase" style="color: var(--primary)">Start</button>
+                                <button id="timerReset" class="text-[10px] font-black uppercase text-red-500">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel rounded-[2rem] p-6 flex flex-col justify-center shadow-sm border border-black/5">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10px] font-black uppercase tracking-widest opacity-60">Daily Progress</span>
+                            <span id="progressText" class="text-xs font-black">0%</span>
+                        </div>
+                        <div class="h-3 w-full bg-black/5 rounded-full overflow-hidden mb-3">
+                            <div id="progressBar" class="h-full transition-all duration-700" style="width: 0%; background: var(--accent)"></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">🔥</span>
+                            <span id="streakDisplay" class="font-black text-sm">0 Day Streak</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Task Input Section -->
+                <div class="glass-panel rounded-[2rem] p-6 shadow-md border border-black/5">
+                    <div class="flex flex-col gap-4">
+                        <div class="flex gap-2">
+                            <input id="manualTaskInput" type="text" placeholder="Add a new task manually..." 
+                                class="flex-1 bg-white/50 dark:bg-black/20 rounded-xl px-4 py-3 text-sm outline-none border border-black/10">
+                            <button id="manualAddBtn" class="px-6 py-3 rounded-xl font-bold text-white text-sm transition-all" style="background: var(--accent)">Add</button>
+                        </div>
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <select id="taskPriorityInput" class="bg-white/50 dark:bg-black/20 px-3 py-2 rounded-lg text-[10px] font-bold uppercase outline-none border border-black/10">
+                                <option value="normal">Normal Priority</option>
+                                <option value="high">High Priority</option>
+                                <option value="low">Low Priority</option>
+                            </select>
+                            <input id="taskDateInput" type="date" class="bg-white/50 dark:bg-black/20 px-3 py-2 rounded-lg text-[10px] font-bold outline-none border border-black/10">
+                            <label class="flex items-center gap-2 cursor-pointer ml-2">
+                                <input type="checkbox" id="taskRecurringInput" class="w-4 h-4 rounded">
+                                <span class="text-[10px] font-bold uppercase opacity-60">Recurring</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Controls -->
+                <div class="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
+                    <button onclick="setFilter('all')" class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-bold uppercase bg-white/50 border border-black/10">All</button>
+                    <button onclick="setFilter('today')" class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-bold uppercase bg-white/50 border border-black/10">Today</button>
+                    <button onclick="setFilter('high')" class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-bold uppercase bg-white/50 border border-black/10 text-red-500">Urgent</button>
+                </div>
+
+                <!-- List Output -->
+                <div id="taskList" class="space-y-3 pb-20"></div>
+            </div>
+
+            <!-- AI Sidebar -->
+            <div class="lg:col-span-4 h-full">
+                <div class="glass-panel rounded-[2.5rem] flex flex-col h-[750px] sticky top-8 shadow-xl border border-black/5 overflow-hidden">
+                    <div class="p-6 text-white flex justify-between items-center" style="background: var(--secondary)">
+                        <div>
+                            <h3 class="font-black text-sm uppercase tracking-widest">TaskFlow AI</h3>
+                            <p class="text-[8px] font-bold opacity-50 uppercase">Secured Agent</p>
+                        </div>
+                        <button id="clearChat" class="text-[10px] font-bold opacity-50 hover:opacity-100">Reset</button>
+                    </div>
+                    
+                    <div id="chatHistory" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                        <div class="bg-white/80 dark:bg-black/20 p-4 rounded-2xl rounded-tl-none border border-black/5 text-sm leading-relaxed">
+                            Hello! I can help you manage your tasks. You can ask me to "Add a task to buy groceries", "Change the priority of the math homework to high", or "Mark the workout as finished".
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-white/50 dark:bg-black/40 border-t border-black/5">
+                        <div class="flex items-center gap-2 bg-white dark:bg-black/60 p-2 rounded-2xl border border-black/20 shadow-sm">
+                            <input id="chatInput" type="text" placeholder="Type message..." 
+                                class="flex-1 bg-transparent border-none outline-none text-sm px-3 py-2">
+                            <button id="sendChat" class="p-3 rounded-xl text-white transition-all hover:scale-105" style="background: var(--accent)">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal System -->
+    <div id="settingsModal" class="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black">AI & Profile</h2>
+                <button onclick="closeModal('settingsModal')" class="p-2 opacity-50 hover:opacity-100">✕</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-black uppercase tracking-widest opacity-50 block mb-1">Your Name</label>
+                    <input id="userNameInput" type="text" class="w-full bg-black/5 dark:bg-white/5 px-4 py-3 rounded-xl outline-none font-bold border border-black/5">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black uppercase tracking-widest opacity-50 block mb-1">AI Directives / Specific Instructions</label>
+                    <textarea id="userDirectivesInput" rows="4" placeholder="(MENTION THINGS U WANT TASKFLOW TO KNOW ABOUT YOU.)" 
+                        class="w-full bg-black/5 dark:bg-white/5 px-4 py-3 rounded-xl outline-none text-sm border border-black/5"></textarea>
+                </div>
+                <button id="saveSettings" class="w-full py-4 rounded-2xl font-black text-white shadow-lg transition-all" style="background: var(--accent)">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="alertSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+
+    <script>
+        const groqKey = "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"; 
+        
+        let tasks = JSON.parse(localStorage.getItem('tf_v11_tasks') || '[]');
+        let profile = JSON.parse(localStorage.getItem('tf_v11_profile') || '{"name": "", "darkMode": false, "directives": ""}');
+        let stats = JSON.parse(localStorage.getItem('tf_v11_stats') || '{"streak": 0, "lastActive": ""}');
+        let currentFilter = 'all';
+
+        const UI = {
+            taskList: document.getElementById('taskList'),
+            chatHistory: document.getElementById('chatHistory'),
+            timerDisplay: document.getElementById('timerDisplay'),
+            progressBar: document.getElementById('progressBar'),
+            progressText: document.getElementById('progressText'),
+            streakDisplay: document.getElementById('streakDisplay'),
+            chatInput: document.getElementById('chatInput')
+        };
+
+        function save() {
+            localStorage.setItem('tf_v11_tasks', JSON.stringify(tasks));
+            localStorage.setItem('tf_v11_profile', JSON.stringify(profile));
+            localStorage.setItem('tf_v11_stats', JSON.stringify(stats));
+            render();
+            updateInsights();
+        }
+
+        function render() {
+            const today = new Date().toISOString().split('T')[0];
+            let filtered = [...tasks];
+            if (currentFilter === 'today') filtered = filtered.filter(t => t.dueDate === today || !t.dueDate);
+            if (currentFilter === 'high') filtered = filtered.filter(t => t.priority === 'high');
+
+            UI.taskList.innerHTML = filtered.map((t, idx) => `
+                <div class="task-card glass-panel p-5 rounded-[1.5rem] flex items-center gap-4 priority-${t.priority} ${t.completed ? 'opacity-40' : ''}" data-id="${t.id}">
+                    <button onclick="toggleTask(${t.id})" class="w-6 h-6 rounded-lg border-2 border-black/10 flex items-center justify-center transition-all ${t.completed ? 'bg-[#215E61] border-[#215E61] text-white' : 'bg-white'}">
+                        ${t.completed ? '✓' : ''}
+                    </button>
+                    <div class="flex-1">
+                        <input type="text" value="${t.text}" onchange="editTask(${t.id}, this.value)" 
+                               class="bg-transparent border-none outline-none w-full font-bold text-sm ${t.completed ? 'line-through opacity-50' : ''}" 
+                               ${t.completed ? 'disabled' : ''}>
+                        <div class="flex gap-3 mt-1 opacity-50">
+                            ${t.dueDate ? `<span class="text-[9px] font-bold">📅 ${t.dueDate}</span>` : '<span class="text-[9px] font-bold opacity-60">Anytime</span>'}
+                            ${t.priority !== 'normal' ? `<span class="text-[9px] font-bold uppercase tracking-widest">${t.priority}</span>` : ''}
+                            ${t.recurring ? `<span class="text-[9px] font-bold">🔄 Recurring</span>` : ''}
+                        </div>
+                    </div>
+                    <button onclick="deleteTask(${t.id})" class="text-red-400 hover:text-red-600 p-2">✕</button>
+                </div>
+            `).join('');
+            
+            if (filtered.length === 0) {
+                UI.taskList.innerHTML = `<div class="text-center py-20 opacity-30 font-bold text-sm">No tasks currently visible.</div>`;
+            }
+
+            initSortable();
+        }
+
+        function initSortable() {
+            if (currentFilter !== 'all') return;
+            new Sortable(UI.taskList, {
+                animation: 250,
+                ghostClass: 'sortable-ghost',
+                onEnd: function (evt) {
+                    const movedItem = tasks.splice(evt.oldIndex, 1)[0];
+                    tasks.splice(evt.newIndex, 0, movedItem);
+                    save();
+                }
+            });
+        }
+
+        function updateInsights() {
+            const today = new Date().toISOString().split('T')[0];
+            // Fix: Include undated tasks in daily progress calculation
+            const todaysTasks = tasks.filter(t => t.dueDate === today || !t.dueDate);
+            const done = todaysTasks.filter(t => t.completed).length;
+            const pct = todaysTasks.length > 0 ? Math.round((done / todaysTasks.length) * 100) : 0;
+            
+            UI.progressBar.style.width = pct + '%';
+            UI.progressText.textContent = pct + '%';
+            UI.streakDisplay.textContent = `${stats.streak} Day Streak`;
+            document.getElementById('userStatus').textContent = profile.name ? `Welcome, ${profile.name}` : 'System Ready';
+            
+            if (profile.darkMode) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').textContent = '☀️';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeIcon').textContent = '🌙';
+            }
+        }
+
+        async function handleChat() {
+            const val = UI.chatInput.value.trim();
+            if (!val) return;
+
+            addChatMessage('user', val);
+            UI.chatInput.value = '';
+
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const taskContext = tasks.map(t => `ID: ${t.id}, Text: "${t.text}", Status: ${t.completed ? 'Done' : 'Pending'}, Priority: ${t.priority}, Due: ${t.dueDate || 'None'}`).join(' | ');
+                
+                const sys = `You are TaskFlow AI. You manage a user's productivity.
+                FOUNDER: The founder of TaskFlow AI is Tejas Yadav. If the user asks about the creator or founder, always mention Tejas Yadav.
+                USER: ${profile.name}
+                CURRENT DATE: ${today}
+                USER PREFERENCES: ${profile.directives}
+                TASKS DATA: [ ${taskContext} ]
+
+                ABILITIES:
+                1. Add new tasks.
+                2. Edit existing tasks (change text, priority, due date, or toggle completion).
+                3. Chat normally.
+
+                RESPONSE SCHEMA (MUST BE JSON):
+                {
+                  "reply": "friendly message confirming changes or answering user",
+                  "newTasks": [{"text": "...", "priority": "high/normal/low", "date": "YYYY-MM-DD"}],
+                  "modifiedTasks": [{"id": ID_FROM_CONTEXT, "text": "optional new text", "priority": "optional new priority", "date": "optional YYYY-MM-DD", "completed": boolean_if_toggling}]
+                }
+
+                Strict rules:
+                - If the user says "mark X as done", include it in modifiedTasks with completed: true.
+                - If the user says "change Y to high priority", find the ID and put it in modifiedTasks.
+                - Use context to match task names to IDs.`;
+
+                const result = await fetchGroqAI(val, sys);
+                addChatMessage('ai', result.reply);
+                
+                // Process New Tasks
+                if (result.newTasks?.length > 0) {
+                    result.newTasks.forEach(t => {
+                        tasks.unshift({ 
+                            id: Date.now() + Math.random(), 
+                            text: t.text, 
+                            dueDate: t.date || '', 
+                            priority: t.priority || 'normal', 
+                            completed: false 
+                        });
+                    });
+                }
+
+                // Process Modifications
+                if (result.modifiedTasks?.length > 0) {
+                    result.modifiedTasks.forEach(mod => {
+                        const target = tasks.find(t => t.id == mod.id);
+                        if (target) {
+                            if (mod.text) target.text = mod.text;
+                            if (mod.priority) target.priority = mod.priority;
+                            if (mod.date !== undefined) target.dueDate = mod.date;
+                            if (mod.completed !== undefined) {
+                                target.completed = mod.completed;
+                                if (mod.completed) updateStreak();
+                            }
+                        }
+                    });
+                }
+
+                save();
+            } catch (e) {
+                console.error(e);
+                addChatMessage('ai', "I'm having trouble connecting right now. Please try again.");
+            }
+        }
+
+        async function fetchGroqAI(prompt, system, retries = 3) {
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${groqKey}`
+                },
+                body: JSON.stringify({
+                    model: "llama-3.3-70b-versatile",
+                    messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
+                    response_format: { type: "json_object" }
+                })
+            });
+            if (!response.ok) throw new Error("API_ERROR");
+            const data = await response.json();
+            return JSON.parse(data.choices[0].message.content);
+        }
+
+        function addChatMessage(role, txt) {
+            const div = document.createElement('div');
+            const isUser = role === 'user';
+            div.className = isUser ? 'ml-auto bg-[#FE7F2D]/20 p-4 rounded-2xl rounded-tr-none text-right max-w-[85%]' : 'mr-auto bg-black/5 dark:bg-white/10 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-black/5';
+            div.innerHTML = `<p class="text-[8px] font-black uppercase opacity-40 mb-1">${isUser ? 'You' : 'TaskFlow AI'}</p><div class="text-sm">${txt}</div>`;
+            UI.chatHistory.appendChild(div);
+            UI.chatHistory.scrollTop = UI.chatHistory.scrollHeight;
+        }
+
+        function updateStreak() {
+            const today = new Date().toISOString().split('T')[0];
+            if (stats.lastActive !== today) {
+                stats.streak++;
+                stats.lastActive = today;
+            }
+        }
+
+        window.toggleTask = (id) => {
+            const t = tasks.find(x => x.id === id);
+            if (t) {
+                t.completed = !t.completed;
+                if (t.completed) updateStreak();
+                save();
+            }
+        };
+
+        window.editTask = (id, newText) => {
+            const t = tasks.find(x => x.id === id);
+            if (t && newText.trim()) {
+                t.text = newText.trim();
+                save();
+            } else render();
+        };
+
+        window.deleteTask = (id) => { tasks = tasks.filter(x => x.id !== id); save(); };
+        window.setFilter = (f) => { currentFilter = f; render(); };
+
+        document.getElementById('manualAddBtn').onclick = () => {
+            const text = document.getElementById('manualTaskInput').value.trim();
+            if (!text) return;
+            tasks.unshift({ id: Date.now(), text, priority: document.getElementById('taskPriorityInput').value, dueDate: document.getElementById('taskDateInput').value, recurring: document.getElementById('taskRecurringInput').checked, completed: false });
+            document.getElementById('manualTaskInput').value = '';
+            save();
+        };
+
+        // Timer
+        let timerSeconds = 25 * 60;
+        let timerActive = false;
+        let tInterval;
+        document.getElementById('timerToggle').onclick = () => {
+            timerActive = !timerActive;
+            document.getElementById('timerToggle').textContent = timerActive ? 'Pause' : 'Start';
+            if (timerActive) {
+                tInterval = setInterval(() => {
+                    if (timerSeconds > 0) {
+                        timerSeconds--;
+                        const m = Math.floor(timerSeconds / 60);
+                        const s = timerSeconds % 60;
+                        UI.timerDisplay.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+                    } else {
+                        clearInterval(tInterval);
+                        document.getElementById('alertSound').play();
+                        timerActive = false;
+                        document.getElementById('timerToggle').textContent = 'Start';
+                    }
+                }, 1000);
+            } else clearInterval(tInterval);
+        };
+        document.getElementById('timerReset').onclick = () => {
+            clearInterval(tInterval);
+            timerActive = false;
+            let mins = parseInt(document.getElementById('timerInput').value) || 25;
+            timerSeconds = Math.min(Math.max(mins, 10), 180) * 60;
+            UI.timerDisplay.textContent = `${Math.floor(timerSeconds/60)}:00`;
+            document.getElementById('timerToggle').textContent = 'Start';
+        };
+
+        document.getElementById('settingsBtn').onclick = () => {
+            document.getElementById('userNameInput').value = profile.name || '';
+            document.getElementById('userDirectivesInput').value = profile.directives || '';
+            document.getElementById('settingsModal').classList.remove('hidden');
+        };
+        document.getElementById('saveSettings').onclick = () => {
+            profile.name = document.getElementById('userNameInput').value;
+            profile.directives = document.getElementById('userDirectivesInput').value;
+            save();
+            document.getElementById('settingsModal').classList.add('hidden');
+        };
+        document.getElementById('darkModeToggle').onclick = () => { profile.darkMode = !profile.darkMode; save(); };
+        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+        document.getElementById('clearChat').onclick = () => UI.chatHistory.innerHTML = '';
+        UI.chatInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleChat());
+        document.getElementById('sendChat').onclick = handleChat;
+
+        save();
+    </script>
+</body>
+</html>
