@@ -306,71 +306,76 @@
             }
         }
 
-        async function handleChat() {
-            const val = UI.chatInput.value.trim();
-            if (!val) return;
+       async function handleChat() {
+    try {
+        const val = UI.chatInput.value.trim();
+        if (!val) return;
 
-            addChatMessage('user', val);
-            UI.chatInput.value = '';
+        addChatMessage('user', val);
+        UI.chatInput.value = '';
 
-            try {
-                const today = new Date().toISOString().split('T')[0];
-                const taskContext = tasks.map(t => `ID: ${t.id}, Text: "${t.text}", Status: ${t.completed ? 'Done' : 'Pending'}, Priority: ${t.priority}, Due: ${t.dueDate || 'None'}`).join(' | ');
-                
-                const sys = `You are TaskFlow AI, a productivity assistant.
-                BACKGROUND: Only mention that you were created/founded by Tejas Yadav if the user explicitly asks about your creator, founder, or who made you. Do not volunteer this info in general conversation.
-                USER: ${profile.name}
-                CURRENT DATE: ${today}
-                DIRECTIVES: ${profile.directives}
-                CONTEXT: [ ${taskContext} ]
+        const today = new Date().toISOString().split('T')[0];
+        const taskContext = tasks.map(t =>
+            `ID: ${t.id}, Text: "${t.text}", Status: ${t.completed ? 'Done' : 'Pending'}, Priority: ${t.priority}, Due: ${t.dueDate || 'None'}`
+        ).join(' | ');
 
-                ABILITIES:
-                1. Add tasks: "newTasks" array.
-                2. Edit tasks: "modifiedTasks" array.
-                
-                OUTPUT SCHEMA (JSON ONLY):
-                {
-                  "reply": "friendly message",
-                  "newTasks": [{"text": "...", "priority": "high/normal/low", "date": "YYYY-MM-DD"}],
-                  "modifiedTasks": [{"id": ID, "text": "optional", "priority": "optional", "date": "optional", "completed": boolean}]
-                }`;
+        const sys = `You are TaskFlow AI, a productivity assistant.
+USER: ${profile.name}
+CURRENT DATE: ${today}
+DIRECTIVES: ${profile.directives}
+CONTEXT: [ ${taskContext} ]
 
-                const result = await fetchGroqAI(val, sys);
-                addChatMessage('ai', result.reply);
-                
-                if (result.newTasks?.length > 0) {
-                    result.newTasks.forEach(t => {
-                        tasks.unshift({ 
-                            id: Date.now() + Math.floor(Math.random() * 1000), 
-                            text: t.text, 
-                            dueDate: t.date || '', 
-                            priority: t.priority || 'normal', 
-                            completed: false 
-                        });
-                    });
-                }
+OUTPUT JSON ONLY:
+{
+  "reply": "message",
+  "newTasks": [],
+  "modifiedTasks": []
+}`;
 
-                if (result.modifiedTasks?.length > 0) {
-                    result.modifiedTasks.forEach(mod => {
-                        const target = tasks.find(t => t.id == mod.id);
-                        if (target) {
-                            if (mod.text) target.text = mod.text;
-                            if (mod.priority) target.priority = mod.priority;
-                            if (mod.date !== undefined) target.dueDate = mod.date;
-                            if (mod.completed !== undefined) {
-                                target.completed = mod.completed;
-                                if (mod.completed) updateStreak();
-                            }
-                        }
-                    });
-                }
+        const result = await fetchGroqAI(val, sys);
 
-                save();
-            } catch (e) {
-                console.error(e);
-                addChatMessage('ai', "I'm having trouble connecting. Please try again.");
-            }
+        // 🧠 SAFE HANDLING (this was missing)
+        if (!result || typeof result !== "object") {
+            addChatMessage('ai', "⚠️ Server returned nothing useful");
+            return;
         }
+
+        addChatMessage('ai', result.reply || "⚠️ No reply from AI");
+
+        if (result.newTasks?.length) {
+            result.newTasks.forEach(t => {
+                tasks.unshift({
+                    id: Date.now() + Math.random(),
+                    text: t.text,
+                    dueDate: t.date || '',
+                    priority: t.priority || 'normal',
+                    completed: false
+                });
+            });
+        }
+
+        if (result.modifiedTasks?.length) {
+            result.modifiedTasks.forEach(mod => {
+                const target = tasks.find(t => t.id == mod.id);
+                if (!target) return;
+
+                if (mod.text) target.text = mod.text;
+                if (mod.priority) target.priority = mod.priority;
+                if (mod.date !== undefined) target.dueDate = mod.date;
+                if (mod.completed !== undefined) {
+                    target.completed = mod.completed;
+                    if (mod.completed) updateStreak();
+                }
+            });
+        }
+
+        save();
+
+    } catch (e) {
+        console.error(e);
+        addChatMessage('ai', "⚠️ Something broke while connecting");
+    }
+}
 
   async function fetchGroqAI(prompt, system) {
   const response = await fetch("/api/chat", {
