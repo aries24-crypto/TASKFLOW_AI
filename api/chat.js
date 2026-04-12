@@ -26,7 +26,17 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     // Send ONLY what frontend needs
-    const parsed = JSON.parse(data.choices[0].message.content);
+    let parsed;
+
+try {
+  parsed = JSON.parse(data.choices[0].message.content);
+} catch {
+  parsed = {
+    reply: "AI response error",
+    newTasks: [],
+    modifiedTasks: []
+  };
+}
 
     return res.status(200).json(parsed);
 
