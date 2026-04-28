@@ -377,17 +377,29 @@ OUTPUT JSON ONLY:
     }
 }
 
-  async function fetchGroqAI(prompt, system) {
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ prompt, system })
-  });
+  function getApiBaseUrl() {
+    const saved = localStorage.getItem("taskflow_api_base_url");
+    if (saved) return saved.replace(/\/$/, "");
+    return window.location.origin;
+  }
 
-  return await response.json();
-}
+  async function fetchGroqAI(prompt, system) {
+    const endpoint = `${getApiBaseUrl()}/api/chat`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ prompt, system })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload?.error || `Request failed (${response.status})`;
+      throw new Error(message);
+    }
+    return payload;
+  }
 
         function addChatMessage(role, txt) {
             const div = document.createElement('div');
